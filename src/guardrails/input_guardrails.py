@@ -38,9 +38,26 @@ def detect_injection(user_input: str) -> bool:
         True if injection detected, False otherwise
     """
     INJECTION_PATTERNS = [
-        # TODO: Add at least 5 regex patterns
-        # Example:
-        # r"ignore (all )?(previous|above) instructions",
+        r"ignore (all )?(previous|above|prior) instructions",
+        r"you are now\b",
+        r"(reveal|show|print|output|display) (your )?(system prompt|instructions|config)",
+        r"pretend (you are|to be)",
+        r"act as (a |an )?unrestricted",
+        r"forget (all |your )?(previous |prior )?(instructions|directives|rules)",
+        r"disregard (all |your )?(previous |prior )?(instructions|directives)",
+        r"override (your )?(system|instructions)",
+        r"translate (your |all )?(instructions|system prompt|config)",
+        r"bỏ qua (mọi |tất cả )?(hướng dẫn|chỉ thị)",   
+        r"tiết lộ (mật khẩu|api key|password)",          
+        r"hãy (tiết lộ|cho tôi biết) (mật khẩu|cấu hình)", 
+        r"fill in.{0,50}(password|api key|secret|credential)",
+        r"(api key|password|secret)\s*=\s*___",
+        r"fill in the blanks.*(password|api key|database)",
+        r"(traduire|traduction).*(instructions|notes|configuration)",
+        r"(short story|narrator).*(password|api key|credentials)",
+        r"(IT Admin|verify against my records|db\.vinbank\.internal)",
+        r"which internal (systems|databases|environments) you have access",
+        r"stored in your (internal notes|system prompt)"
     ]
 
     for pattern in INJECTION_PATTERNS:
@@ -70,12 +87,21 @@ def topic_filter(user_input: str) -> bool:
     """
     input_lower = user_input.lower()
 
-    # TODO: Implement logic:
-    # 1. If input contains any blocked topic -> return True
-    # 2. If input doesn't contain any allowed topic -> return True
-    # 3. Otherwise -> return False (allow)
+    # 1. Nếu rỗng hoặc quá ngắn -> block
+    if len(user_input.strip()) < 3:
+        return True
 
-    pass  # Replace with your implementation
+    # 2. Nếu chứa bất kỳ topic bị cấm nào -> block ngay
+    for topic in BLOCKED_TOPICS:
+        if topic in input_lower:
+            return True
+
+    # 3. Nếu KHÔNG chứa topic được phép nào -> block (vì off-topic)
+    for topic in ALLOWED_TOPICS:
+        if topic in input_lower:
+            return False
+
+    return True  # Mặc định block nếu không thuộc allowed topics
 
 
 # ============================================================
@@ -135,7 +161,24 @@ class InputGuardrailPlugin(base_plugin.BasePlugin):
         #    - If True: increment blocked_count, return self._block_response("...")
         # 3. If both are False: return None (let message through)
 
-        pass  # Replace with your implementation
+        # Check injection first
+        if detect_injection(text):
+            self.blocked_count += 1
+            return self._block_response(
+                "Yêu cầu của bạn chứa nội dung không được phép. "
+                "Tôi chỉ hỗ trợ các câu hỏi liên quan đến dịch vụ ngân hàng VinBank."
+            )
+        
+        # Check topic
+        if topic_filter(text):
+            self.blocked_count += 1
+            return self._block_response(
+                "Tôi là trợ lý VinBank và chỉ có thể hỗ trợ các câu hỏi về "
+                "tài khoản, giao dịch, vay vốn và các dịch vụ ngân hàng. "
+                "Vui lòng đặt câu hỏi liên quan đến ngân hàng."
+            )
+        
+        return None 
 
 
 # ============================================================
